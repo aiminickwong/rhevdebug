@@ -205,11 +205,17 @@ if [ $dbdump != "" ]
 then
 
 	messDEBUG "Found database file $dbdump"
-	dbdir=$(echo $dbdump | sed s/sos_pgdump\.tar//)
+	dbdir=$(echo $dbdump | sed s/sos_pgdump\.tar/\//)
 	messDEBUG "Database directory is $dbdir"
-	tar xvf $dbdump &2>/dev/null
+	tar -xvfC $dbdir $dbdump
 	
-	datFile=$(xzgrep -i 'copy' $dbdir/* | grep 'spm_vds_id' | grep '\.dat')
+	datFile=$(xzgrep -i 'copy' ./* | grep 'spm_vds_id' | grep '\.dat')
+	messDEBUG $(xzgrep -i 'copy' ./*)
+	sleep 3
+	messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id')
+	sleep 3
+	messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id' | grep '\.dat')
+	
 	messDEBUG "dat file located at $datFile"
 	
 	datFile=${datFile##\.*\$\/}

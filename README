@@ -1,0 +1,11 @@
+#########
+#
+# rhevdebug.sh
+#
+# written by Wallace Daniel
+#
+#########
+
+The way this program operates is an evolving process. As of now, you either specify a thread ID (with the engine log and vdsm log) to pull the relevant information from the logs, or you can point the program to the root of the LC (WIP).
+
+The end goal of this project is to make reading and parsing a log collector much quicker and efficient. By yanking out all members of a thread, with the relevant VDSM errors in that time frame, a user would not have to spend as much time parsing logs manually. Maybe this could lead to automatically loading the database on a dbviewer, maybe this will evolve to a python project which can utilize the REST API.. there's much work the be done.

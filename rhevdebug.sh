@@ -3,26 +3,32 @@
 # FUNCTION: yankThread() is meant to take all commands of a specified ID and present them
 function yankThread() {
 
-	#echo "DEBUG: User has requested all members of thread $1 from file $2"
+	#messDEBUG "User has requested all members of thread $1 from file $2"
 	# grepping for the thread
-	#echo "DEBUG: Yanked `grep $1 $2 | wc -l` lines"
+	#messDEBUG "Yanked `grep $1 $2 | wc -l` lines"
 	threadTrace=thread_$1.log
 	
-	xzgrep $1 $2.1-* > $threadTrace
-	
+	grep $1 $2 > $threadTrace
+	## FIX MEEEEE
+		
 	# Prepping output 
 	startTime=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $1,$2}' | cut -c 1-19)
 	endTime=$(cut -d':' -f2- $threadTrace | tail -n 1 | awk '{print $1,$2}' | cut -c 1-19)
-	#echo "DEBUG: Start time from log: $startTime"
-	#echo "DEBUG: End time from log: $endTime"
+	#messDEBUG "Start time from log: $startTime"
+	#messDEBUG "End time from log: $endTime"
 	
-	commandRun=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $4}')
-	#echo "DEBUG: This thread was for the command: $commandRun"
-	entity=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $16}')
-	#echo "DEBUG: The entity affected was: $entity"	
+	## For the below command, if we use grep then awk should print 3;
+	## if we use xzgrep it should print 4 to account for the filename column
+	commandRun=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $3}')
+	#messDEBUG "$(cut -d':' -f2- $threadTrace)"
+        #messDEBUG "$(cut -d':' -f2- $threadTrace | head -n 1)"
+	#messDEBUG "$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $4}')"
+	#messDEBUG "This thread was for the command: $commandRun"
+	entity=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $15}')
+	#messDEBUG "The entity affected was: $entity"	
 	
 	numErr=$(grep 'ERROR' $threadTrace | wc -l)
-	#echo "DEBUG: Number of errors is $numErr"
+	#messDEBUG "Number of errors is $numErr"
 	errMessage=$(grep 'ERROR' $threadTrace | tail -n 1 | cut -d' ' -f8-)
 
 	## Next steps: compare UUID returned as $entity to database???
@@ -34,12 +40,12 @@ function yankThread() {
 	echo ""
 	echo -e "\e[1;34mCommand Run: \e[0m\e[33m$commandRun\e[0m"
 	echo -e "\e[1;34mEntity UUID Affected: \e[0m\e[33m$entity\e[0m"
- 	echo "DEBUG: Look into dynamically generating psql commands based upon the above UUID and 'Command Run' context"
+ 	messDEBUG "Look into dynamically generating psql commands based upon the above UUID and 'Command Run' context"
 	echo ""
 	
 	### Error message processing
 	### Any reason to think there are multiple messages to be listed here?
-	#echo "DEBUG: Should add the time of the error message below"
+	#messDEBUG "Should add the time of the error message below"
 	echo -e "\e[1;34mNumber of errors in this thread: \e[0m\e[33m$numErr\e[0m"
 	# check to see if there are error message to print
 	if [ $numErr != 0 ]
@@ -52,7 +58,7 @@ function yankThread() {
         echo -e "\e[1;34m------------------------------------------------\e[0m"
 	if  [ "$3" != "" ]
 	then
-		echo "DEBUG: Calling yank VDSM with $startTime and $endTime"
+		messDEBUG "Calling yank VDSM with $startTime and $endTime"
 		yankVDSM "$startTime" "$endTime" $3
 	else
 		echo "No vdsm.log file specified" 
@@ -68,7 +74,7 @@ function loadDatabase(){
 
 	if [ $1 == "" ]
 	then
-		echo "DEBUG: No database specified."
+		messDEBUG "No database specified."
 		exit 1
 	fi
 
@@ -81,35 +87,35 @@ ssh root@$1 "export PGPASSFILE=/etc/ovirt-engine/.pgpass; psql -U engine engine 
 # Right now this is meant to be called only by the '-t' flag as a result of finding errors
 function yankVDSM() {
 
-	echo "DEBUG: cutting start time of $1"
+	messDEBUG "cutting start time of $1"
 	startTime=$(echo $1 | cut -c 1-16) 
 	# trying sed to escape special characters as this will be used as regex for vdsm searching
 	startTime=$(echo $startTime | sed -r 's/\-/\\\-/g' | sed -r 's/\ /\\ /g' | sed -r 's/\:/\\\:/g')
-	echo "DEBUG: Will use $startTime as start"
+	messDEBUG "Will use $startTime as start"
 	
-	echo "DEBUG: cutting end time of $2"
+	messDEBUG "cutting end time of $2"
 	endTime=$(echo $2 | cut -c 1-16)
 	endTime=$(echo $endTime | sed -r 's/\-/\\\-/g' | sed -r 's/\ /\\ /g' | sed -r 's/\:/\\\:/g')
-	echo "DEBUG: Will use $endTime as end"
+	messDEBUG "Will use $endTime as end"
 	
-	echo "DEBUG: Finding first line to pull from vdsm log $3.* (includes compressed logs)"
+	messDEBUG "Finding first line to pull from vdsm log $3.* (includes compressed logs)"
 	startFile=$(xzgrep -n "$startTime" $3\.* | head -n 1 | cut -f1 -d':')
 	vdsmLogStart=$(xzgrep -n "$startTime" $3\.* | head -n 1 | cut -f2 -d':')
-	echo "DEBUG: Starting line in $startFile: $vdsmLogStart"
+	messDEBUG "Starting line in $startFile: $vdsmLogStart"
 	
-	echo "DEBUG: Finding last line to pull from vdsm log $3.* (including compressed logs)"
+	messDEBUG "Finding last line to pull from vdsm log $3.* (including compressed logs)"
 	endFile=$(xzgrep -n "$startTime" $3\.* | tail -n 1 | cut -f1 -d':')
 	vdsmLogEnd=$(xzgrep -n "$startTime" $3\.* | tail -n 1 | cut -f2 -d':')
-	echo "DEBUG: Ending line in $endFile: $vdsmLogEnd"
+	messDEBUG "Ending line in $endFile: $vdsmLogEnd"
 	
 	sameLog=false
 	if [ $startFile == $endFile ]
 	then
-		echo "DEBUG: Lines will come from the file $startFile"
+		messDEBUG "Lines will come from the file $startFile"
 		sameLog=true
 		decompressXZ $startFile
 	else
-		echo "DEBUG: Lines will span from file $startFile to $endFile"
+		messDEBUG "Lines will span from file $startFile to $endFile"
 		decompressXZ $startFile $endFile
 	fi
 
@@ -121,21 +127,21 @@ function yankVDSM() {
 	if $sameLog
 	then
 		# This is an embarassingly inefficient way of doing this, but it works for now
-		echo "DEBUG: Detected sameLog = true"
+		messDEBUG "Detected sameLog = true"
 		for i in $(cat $startFile);
 		do
-			echo "DEBUG: current line $messIdx";
+			messDEBUG "current line $messIdx";
 			if [ $messIdx -gt $vdsmLogStart ] 
 			then
-				echo "DEBUG: Line $i from $startFile printed below"
+				messDEBUG "Line $i from $startFile printed below"
 				echo $i
 				#messages[$messIdx]
 			fi;
 			messIdx=$(expr $messIdx + 1);
 		done
-		echo "DEBUG: $messIdx messages printed"
+		messDEBUG "$messIdx messages printed"
 	else
-		echo "DEBUG: Not same log files, placeholder"
+		messDEBUG "Not same log files, placeholder"
 	fi
 	
 }
@@ -146,19 +152,79 @@ declare -a files="$@"
 
 if [ ${#files[@]} -eq 0 ]
 then
-	echo "DEBUG: No files passed to function"
+	messDEBUG "No files passed to function"
 else
 
-	echo "DEBUG: Found file(s), decompressing.."
+	messDEBUG "Found file(s), decompressing.."
 	for i in $(echo ${files[@]});
 	do
-		echo "DEBUG: Processing $i";
+		messDEBUG "Processing $i";
 		#newFileName=$(echo $i | sed s/\.xz//);
-		#echo "DEBUG: New file name is: $newFileName";
+		#messDEBUG "New file name is: $newFileName";
 		xz -d $i;
-		echo "DEBUG: File(s) decompressed";
+		messDEBUG "File(s) decompressed";
 		sleep 5;
 	done
+fi
+
+}
+
+function messDEBUG {
+
+echo -e "\e[36;1mDEBUG: \e[0m$1"
+
+}
+
+function messERROR {
+
+echo -e "\e[31;1m------------------------------------\e[0m"
+echo -e "\e[31;1mERROR: \e[0m$1"
+echo -e "\e[31;1m------------------------------------\e[0m"
+
+}
+
+function setLCRoot {
+
+LCROOT=$1
+messDEBUG "LCROOT has been set to $LCROOT"
+
+getSPM
+
+#messDEBUG "Crawling directory tree for vdsm and engine files..."
+
+#vdsmDIR=$(find $LCROOT | grep '\/vdsm$' | head -n 1)
+#messDEBUG $vdsmDIR
+
+}
+
+function getSPM {
+
+dbdump=$(find $LCROOT | grep 'sos_pgdump\.tar$')
+
+if [ $dbdump != "" ]
+then
+
+	messDEBUG "Found database file $dbdump"
+	dbdir=$(echo $dbdump | sed s/sos_pgdump\.tar//)
+	messDEBUG "Database directory is $dbdir"
+	tar xvf $dbdump &2>/dev/null
+	
+	datFile=$(xzgrep -i 'copy' $dbdir/* | grep 'spm_vds_id' | grep '\.dat')
+	messDEBUG "dat file located at $datFile"
+	
+	datFile=${datFile##\.*\$\/}
+	messDEBUG "datfile has been shortened to: $datFile"
+
+	datFile=${datFile%%\'*\;}
+        messDEBUG "datfile has been shortened to: $datFile" 		
+
+	for i in $(echo  $(cat $datFile | grep -vi 'default' | awk '{print $8}'))
+	do
+		echo $i;
+	done
+
+else
+	messDEBUG "Could not locate dbdump"
 fi
 
 }
@@ -186,7 +252,7 @@ do
 			echo "Please enter an 8 charater thread ID"
 			exit 1
 		   else
-			#echo "DEBUG: function call hit"
+			#messDEBUG "function call hit"
 			yankThread $threadID $3 $4 ## This should work out to -t 'threadID' engine.log vdsm.log <--- $3
 		   fi
 		   ;;
@@ -196,15 +262,11 @@ do
 		   ;;
 		   
 
-		l) lcRoot=${OPTARG}
+		l) LC=${OPTARG}
 		   # This is assumed to be the LC root after the commonly used 'rhevx' tool has extracted the LC
-		   echo "WARNING: This LC Root location should point to the 'sosreport..' dir resulting from the 'rhevx' tool"			  # function goes here
+		   messDEBUG "This LC Root location should point to the 'sosreport..' dir resulting from the 'rhevx' tool"	   
+		   setLCRoot $LC
 		   ;;
-
-		#v) vdsmLog=${OPTARG}
-		#   echo "DEBUG: vdsm log set to $vdsmLog"
-		#   ;;
-	
 
 		:) echo "Option -$OPTARG requires an argument."
 		   exit 1

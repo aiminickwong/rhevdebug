@@ -1,0 +1,8 @@
+Current Capabilities:
+- Yank threads from engine.log files (including compressed), organize them, report errors from them, and then correlate to vdsm logs if provided
+
+- Given the root of a log collector directory, the tool can locate a DB file and extract the current SPMs from all DCs 
+
+
+To Do / Idea List:
+- If tool can not locate dbdump from root dir, search for the 'log-collector-date' dir and extrat all files inside

@@ -171,8 +171,10 @@ fi
 
 function messDEBUG {
 
-echo -e "\e[36;1mDEBUG: \e[0m$1"
-
+if [ $debug == 1 ]
+then
+	echo -e "\e[36;1mDEBUG: \e[0m$1"
+fi
 }
 
 function messERROR {
@@ -201,37 +203,144 @@ function getSPM {
 
 dbdump=$(find $LCROOT | grep 'sos_pgdump\.tar$')
 
-if [ $dbdump != "" ]
+if [ "$dbdump" != "" ]
 then
 
 	messDEBUG "Found database file $dbdump"
-	dbdir=$(echo $dbdump | sed s/sos_pgdump\.tar/\//)
+	dbdir=$(echo $dbdump | sed s/sos_pgdump\.tar//)
 	messDEBUG "Database directory is $dbdir"
-	tar -xvfC $dbdir $dbdump
+	# Extracting (couldn't get it to extract to dbdir for whatever reason)
+	tar -xvf $dbdump >/dev/null 2>&1
+	# moving files to dbdir for sanity
+	for i in $(ls | grep '\.dat')
+	do
+		mv $i $dbdir
+	done
+	for i in $(ls | grep '\.sql')
+	do
+		mv $i $dbdir
+	done
+		
+	datFile=$(xzgrep -i 'copy' ${dbdir}/* | grep 'spm_vds_id' | grep '\.dat')
+	#messDEBUG "$(xzgrep -i 'copy' ${dbdir}/*)"
+	#sleep 3
+	#messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id')
+	#sleep 3
+	#messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id' | grep '\.dat')
 	
-	datFile=$(xzgrep -i 'copy' ./* | grep 'spm_vds_id' | grep '\.dat')
-	messDEBUG $(xzgrep -i 'copy' ./*)
-	sleep 3
-	messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id')
-	sleep 3
-	messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id' | grep '\.dat')
-	
-	messDEBUG "dat file located at $datFile"
+	#messDEBUG "dat file located at $datFile"
 	
 	datFile=${datFile##\.*\$\/}
-	messDEBUG "datfile has been shortened to: $datFile"
+	#messDEBUG "datfile has been shortened to: $datFile"
 
 	datFile=${datFile%%\'*\;}
         messDEBUG "datfile has been shortened to: $datFile" 		
 
-	for i in $(echo  $(cat $datFile | grep -vi 'default' | awk '{print $8}'))
+	#I've yet to find a better way to shorten this down and pull the 'dat' file from the string
+	#From test so far it seems the spm_vds_id field always comes out as the 8th field
+	for i in $(echo  $(cat ${dbdir}/$datFile | sed s/\\t/,/g | grep -vi 'default' | cut -d',' -f8 | grep '^[a-z0-9]'))
 	do
-		echo $i;
+		curSPM="$curSPM $i"
+		messDEBUG "Found UUID: $i"
 	done
+	
+	declare -a spmUUIDS=($curSPM)
+	messDEBUG "Number of UUIDs found: ${#spmUUIDS[@]}"
 
+	# Cycling through dat files again to find vds id
+        datFile=$(xzgrep -i 'copy' ${dbdir}/* | grep 'vds\_static' | grep '\.dat' | grep '\$\$\/')
+	#messDEBUG "datfile is: $datFile"
+
+        datFile=${datFile##\.*\$\/}
+        datFile=${datFile%%\'*\;}
+	messDEBUG "datFile has been shortened to: $datFile"
+	
+	for i in ${spmUUIDS[@]}
+        do
+		messDEBUG "$i"
+                messDEBUG "$(grep $i ${dbdir}/$datFile | awk '{print $2}')"
+		hName=$(grep $i ${dbdir}/$datFile | awk '{print $2}')
+                messDEBUG "Found Host: $hName"
+		hNames="$hNames $hName"
+        done
+	
+	declare -a hostNames=($hNames)
+	messDEBUG "Number of Host names found: ${#hostNames[@]}"
+
+	if [ ${#spmUUIDS[@]} -ne ${#hostNames[@]} ]
+	then
+		messERROR "For some reson the number of found SPM UUIDs does not match the number of found Host names. Exiting.."
+		exit 1
+	else
+		for (( i=0; i < ${#spmUUIDS[@]}; i++ ))
+		do
+			echo -e "\e[1;34m($i) - SPM Host - \e[0m${hostNames[$i]}"
+			echo -e "\e[1;34m      UUID - \e[0m${spmUUIDS[$i]}"
+			echo -e "\e[1;34m-----------------------------------\e[0m"
+		done
+	fi
+
+	## Insert functionality letting engineer choose which SPM they want, pass that on outside of function
+
+
+elif [ -d ${LCROOT}/log-collector-data ]
+then
+	extractData
+	#messDEBUG "Found stuff under $LCROOT/log-collector-data"
+	#count=$(ls ${LCROOT}/log-collector-data | grep '^post' | wc -l)
+	#if [ $count != 0 ]
+	#then
+#		messDEBUG "Extracting..."
+#		xz -d ${LCROOT}/log-collector-data/*.xz >/dev/null 2>&1
+#		tar xvf ${LCROOT}/log-collector-data/*.tar >/dev/null 2>&1
+#	else
+#		messERROR "No compressed database found in the folder"
+#		exit 1
+#	fi
 else
-	messDEBUG "Could not locate dbdump"
+	messERROR "Could not locate dbdump"
 fi
+
+}
+
+function extractData {
+
+
+        messDEBUG "Found stuff under $LCROOT/log-collector-data"
+        count=$(ls ${LCROOT}/log-collector-data | grep '^post' | wc -l)
+        if [ $count != 0 ]
+        then
+                messDEBUG "Extracting..."
+                xz -d ${LCROOT}/log-collector-data/*.xz >/dev/null 2>&1
+                tar xvf ${LCROOT}/log-collector-data/*.tar >/dev/null 2>&1
+        else
+                messERROR "No compressed database found in the folder"
+                exit 1
+        fi
+
+	messDEBUG "Extracted database, moving to host sosreports"
+
+	count=$(ls ${LCROOT}/log-collector-data/ | grep '^[0-9]' | wc -l)
+	if [ $count != 0 ]
+	then
+		messDEBUG "Extracting sosreports"
+		temp=1
+		for i in $(ls ${LCROOT}/log-collector-data | grep '^[0-9]')
+		do
+			echo -en "\e[1;34mDEBUG: \e[0mExtracting $temp / $count \r" 
+			folder=${LCROOT}/log-collector-data/$i
+			xz -d ${folder}/* >/dev/null 2>&1
+			tar xvf ${folder}/* >/dev/null 2>&1
+			temp=`expr $temp + 1`
+			
+		done
+	else
+		messERROR "No sosreports found"
+		exit 1
+	fi
+	messDEBUG "Calling function getSPM.."
+	getSPM
+	
 
 }
 #-------------------------------------------------------
@@ -244,10 +353,10 @@ threadID=""
 database=""
 logFile=""
 vdsmLog=""
-
+debug=0
 ###-----------------Main Loop-------------------
 
-while getopts t:d:l: option
+while getopts t:dl: option
 
 do
 	case "${option}"
@@ -263,8 +372,10 @@ do
 		   fi
 		   ;;
 		   		   
-		d) database=${OPTARG}
-		   loadDatabase $database	
+		d) ## Originally used for possible database usage, I'm hijacking for debug purps
+		   debug=1
+		   #database=${OPTARG}
+		   #loadDatabase $database	
 		   ;;
 		   
 

@@ -12,11 +12,12 @@ function yankThread() {
 	## FIX MEEEEE
 		
 	# Prepping output 
-	startTime=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $1,$2}' | cut -c 1-19)
-	endTime=$(cut -d':' -f2- $threadTrace | tail -n 1 | awk '{print $1,$2}' | cut -c 1-19)
+	startTime=$(head -n 1 $threadTrace | sed s/\ /\,/g | cut -d',' -f 1-2 | cut -c 1-16)
+	endTime=$(tail -n 1 $threadTrace | sed s/\ /\,/g | cut -d',' -f 1-2 | cut -c 1-16)
 	#messDEBUG "Start time from log: $startTime"
 	#messDEBUG "End time from log: $endTime"
-	
+		
+
 	## For the below command, if we use grep then awk should print 3;
 	## if we use xzgrep it should print 4 to account for the filename column
 	commandRun=$(cut -d':' -f2- $threadTrace | head -n 1 | awk '{print $3}')
@@ -87,19 +88,19 @@ ssh root@$1 "export PGPASSFILE=/etc/ovirt-engine/.pgpass; psql -U engine engine 
 # Right now this is meant to be called only by the '-t' flag as a result of finding errors
 function yankVDSM() {
 
-	messDEBUG "cutting start time of $1"
-	startTime=$(echo $1 | cut -c 1-16) 
+	#messDEBUG "cutting start time of $1"
+	#startTime=$(echo $1 | cut -c 1-16) 
 	# trying sed to escape special characters as this will be used as regex for vdsm searching
-	startTime=$(echo $startTime | sed -r 's/\-/\\\-/g' | sed -r 's/\ /\\ /g' | sed -r 's/\:/\\\:/g')
+	startTime=$(echo $startTime | sed 's/\-/\\-/g' | sed 's/\,/\\ /g' | sed 's/\:/\\:/g')
 	messDEBUG "Will use $startTime as start"
 	
-	messDEBUG "cutting end time of $2"
-	endTime=$(echo $2 | cut -c 1-16)
-	endTime=$(echo $endTime | sed -r 's/\-/\\\-/g' | sed -r 's/\ /\\ /g' | sed -r 's/\:/\\\:/g')
+	#messDEBUG "cutting end time of $2"
+	#endTime=$(echo $2 | cut -c 1-16)
+	endTime=$(echo $endTime | sed 's/\-/\\-/g' | sed 's/\,/\\ /g' | sed 's/\:/\\:/g')
 	messDEBUG "Will use $endTime as end"
 	
 	messDEBUG "Finding first line to pull from vdsm log $3.* (includes compressed logs)"
-	startFile=$(xzgrep -n "$startTime" $3\.* | head -n 1 | cut -f1 -d':')
+	startFile=$(xzgrep -n "$startTime" $3.* | head -n 1 | cut -f1 -d':')
 	vdsmLogStart=$(xzgrep -n "$startTime" $3\.* | head -n 1 | cut -f2 -d':')
 	messDEBUG "Starting line in $startFile: $vdsmLogStart"
 	
@@ -128,14 +129,16 @@ function yankVDSM() {
 	then
 		# This is an embarassingly inefficient way of doing this, but it works for now
 		messDEBUG "Detected sameLog = true"
-		for i in $(cat $startFile);
+		temp=0
+		for i in $(cat $newFileName);
 		do
 			messDEBUG "current line $messIdx";
 			if [ $messIdx -gt $vdsmLogStart ] 
 			then
 				messDEBUG "Line $i from $startFile printed below"
 				echo $i
-				#messages[$messIdx]
+				messages[$temp]=$i
+				temp=$(expr $temp + 1)
 			fi;
 			messIdx=$(expr $messIdx + 1);
 		done
@@ -159,11 +162,12 @@ else
 	for i in $(echo ${files[@]});
 	do
 		messDEBUG "Processing $i";
-		#newFileName=$(echo $i | sed s/\.xz//);
-		#messDEBUG "New file name is: $newFileName";
+		newFileName=$(echo $i | sed s/\.xz//);
+		messDEBUG "New file name is: $newFileName";
+		cp $i $i.bak;
 		xz -d $i;
 		messDEBUG "File(s) decompressed";
-		sleep 5;
+		
 	done
 fi
 
@@ -353,14 +357,19 @@ threadID=""
 database=""
 logFile=""
 vdsmLog=""
-debug=0
+debug=1
 ###-----------------Main Loop-------------------
 
-while getopts t:dl: option
+while getopts ht:dl: option
 
 do
 	case "${option}"
 	in
+		
+		h) messDEBUG "Output some help message here..."
+		   exit 0
+		   ;;
+
 		t) threadID=${OPTARG}
 		   if [[ $threadID == '[a-z0-9][a-z0-9][a-z0-9][a-z0-9][a-z0-9][a-z0-9][a-z0-9][a-z0-9]' ]]
 		   then
@@ -368,7 +377,14 @@ do
 			exit 1
 		   else
 			#messDEBUG "function call hit"
-			yankThread $threadID $3 $4 ## This should work out to -t 'threadID' engine.log vdsm.log <--- $3
+			
+			if [[ $(grep 'engine' $3) ]]
+			then
+				messDEBUG "Found engine log in arg 3"
+				yankThread $threadID $3 $4 ## This should work out to -t 'threadID' engine.log vdsm.log <--- $3
+			else 
+				messDEBUG "Oops"
+			fi
 		   fi
 		   ;;
 		   		   

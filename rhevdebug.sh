@@ -347,6 +347,19 @@ function extractData {
 	
 
 }
+
+function echoHELP {
+
+	echo -e "\e[1;34mThis script is meant to aide in the quick parsing of data from a log collector."
+	echo  "Usage:"
+	echo -e "'-l' This flag should be followed by the path to the root of the rhevx-extraced log collector.\e[0m"
+	echo -e "\e[1;31m# rhevdebug.sh -l ./sosreport-LogCollector/\e[0m"
+	echo -e "\e[1;34m'-t' This flag should be followed by an 8 digit Correlation ID from the engine log, as well as the path to the engine.log\e[0m"
+	echo -e "\e[1;31m# rhevdebug.sh -t 2376e8a3 ./path/to/engine.log\e[0m"
+	echo "This flag will also parse the vdsm logs.. eventually"
+
+}
+
 #-------------------------------------------------------
 ### Playing with the 'getopts' function
 ### In this case I'm thinking:
@@ -366,7 +379,8 @@ do
 	case "${option}"
 	in
 		
-		h) messDEBUG "Output some help message here..."
+		h) #messDEBUG "Output some help message here..."
+		   echoHELP
 		   exit 0
 		   ;;
 

@@ -1,0 +1,78 @@
+ 
+<html>
+
+	<head>
+		<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+		<script type="text/javascript" src="charts.js"></script>
+		<link rel="stylesheet" type="text/css" href="main.css">
+		<script type="text/javascript" src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+		<script type="text/javascript" src="effects.js"></script>
+		<script type="text/javascript">
+			google.load('visualization','1',{'packages':['treemap','corechart','orgchart']});
+
+
+			google.setOnLoadCallback(drawChart);
+		</script>
+		<title>
+			devel webrhev
+		</title>
+	</head>
+
+	<body>
+
+		<div id="top_bar">
+			Testing
+		</div>
+
+		<div id="left_side">
+
+			<div id="tabs" class="left">
+
+				<ul class="left">
+					<li><a href="#engine_tab">engine logs</a></li>
+					<li style="margin-left:1px;"><a href="#vdsm_tab">vdsm logs</a></li>
+					<li style="margin:0; float: right;"><a href="#source_tab">source code</a></li>
+				</ul>
+
+				<div id="engine_tab">
+					engine.log
+				</div>
+				<div id="vdsm_tab">
+					vdsm.log
+				</div>
+				<div id="source_tab">
+					source code
+				</div>
+
+			</div>
+
+		</div>
+
+		<div id="right_side">
+
+			<div id="tabs" class="right">
+
+				<ul class="right">
+					<li><a href="#storage_tab">Storage</a></li>
+					<li style="margin-left:1px"><a href="#network_tab">Networks</a></li>
+					<li style="margin:0; float: right;"><a href="#disk_tab">Disk Map</a></li>
+				</ul>
+
+				<div id="storage_tab" style="z-index:1;">
+					<div id="tree_div"></div>
+
+				</div>
+				<div id="network_tab">
+					network tab
+				</div>
+				<div id="disk_tab">
+					disk map tab
+				</div>
+
+			</div>
+
+		</div>
+
+	</body>
+
+</html>

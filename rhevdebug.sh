@@ -225,20 +225,8 @@ then
 		mv $i $dbdir
 	done
 		
-	datFile=$(xzgrep -i 'copy' ${dbdir}/* | grep 'spm_vds_id' | grep '\.dat')
-	#messDEBUG "$(xzgrep -i 'copy' ${dbdir}/*)"
-	#sleep 3
-	#messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id')
-	#sleep 3
-	#messDEBUG $(xzgrep -i 'copy' ./* | grep 'spm_vds_id' | grep '\.dat')
-	
-	#messDEBUG "dat file located at $datFile"
-	
-	datFile=${datFile##\.*\$\/}
-	#messDEBUG "datfile has been shortened to: $datFile"
-
-	datFile=${datFile%%\'*\;}
-        messDEBUG "datfile has been shortened to: $datFile" 		
+	# Calling function to set dat file for storage_pool table
+	datFile=$(parseDat "spm\_vds\_id")
 
 	#I've yet to find a better way to shorten this down and pull the 'dat' file from the string
 	#From test so far it seems the spm_vds_id field always comes out as the 8th field
@@ -251,17 +239,12 @@ then
 	declare -a spmUUIDS=($curSPM)
 	messDEBUG "Number of UUIDs found: ${#spmUUIDS[@]}"
 
-	# Cycling through dat files again to find vds id
-        datFile=$(xzgrep -i 'copy' ${dbdir}/* | grep 'vds\_static' | grep '\.dat' | grep '\$\$\/')
-	#messDEBUG "datfile is: $datFile"
-
-        datFile=${datFile##\.*\$\/}
-        datFile=${datFile%%\'*\;}
-	messDEBUG "datFile has been shortened to: $datFile"
+	# Calling function to set dat file for vds_static table
+	datFile=$(parseDat "vds\_static")
 	
 	for i in ${spmUUIDS[@]}
         do
-		messDEBUG "$i"
+		messDEBUG "Finding host name for $i"
                 messDEBUG "$(grep $i ${dbdir}/$datFile | awk '{print $2}')"
 		hName=$(grep $i ${dbdir}/$datFile | awk '{print $2}')
                 messDEBUG "Found Host: $hName"
@@ -282,45 +265,129 @@ then
 			echo -e "\e[1;34m      UUID - \e[0m${spmUUIDS[$i]}"
 			echo -e "\e[1;34m-----------------------------------\e[0m"
 		done
+		# Move on to next step
+		chooseSPM
+		
 	fi
 
-	## Insert functionality letting engineer choose which SPM they want, pass that on outside of function
-
-
+		
 elif [ -d ${LCROOT}/log-collector-data ]
 then
 	extractData
-	#messDEBUG "Found stuff under $LCROOT/log-collector-data"
-	#count=$(ls ${LCROOT}/log-collector-data | grep '^post' | wc -l)
-	#if [ $count != 0 ]
-	#then
-#		messDEBUG "Extracting..."
-#		xz -d ${LCROOT}/log-collector-data/*.xz >/dev/null 2>&1
-#		tar xvf ${LCROOT}/log-collector-data/*.tar >/dev/null 2>&1
-#	else
-#		messERROR "No compressed database found in the folder"
-#		exit 1
-#	fi
 else
 	messERROR "Could not locate dbdump"
 fi
 
 }
 
+function chooseSPM {
+
+	if [ ${#spmUUIDS[@]} -eq 1 ]
+	then
+		messDEBUG "Only 1 SPM found, skipping user selection"
+	else
+		messDEBUG "More than 1 SPM found, asking user for input"
+		echo -n "Enter the number of the SPM we are using: "
+		read selectedSPM
+		if [[ $selectedSPM -lt 0 || $selectedSPM -gt $(expr ${#spmUUIDS[@]} - 1) ]]
+		then
+			echo "Value entered is not valid. Please try again."
+			chooseSPM
+		fi
+		
+		messDEBUG "User has selected SPM $selectedSPM"
+		
+		#Moving onto next phase, eval the host
+
+		evalHost
+	fi	
+}
+
+function evalHost {
+	
+	messDEBUG "Function evalHost has been called"
+
+	## Setting up variables for later output
+	
+	# arrays for multiple values
+	declare -a dataDomainNames
+	declare -a dataDomainVG
+	declare -a dataDomainLUNs
+	declare -a dataDomainPaths
+	messDEBUG "Arrays have been declared"
+	
+	# dat files
+	datStoragePool=$(parseDat "master_domain_version")
+	datStorageDomainStatic=$(parseDat "storage_domain_static")
+	datLuns=$(parseDat "luns")
+	messDEBUG "dat files have been set: SP:$datStoragePool;SDS:$datStorageDomainStatic;L:$datLuns"
+	
+	# other variables
+	dbHighMDV=""
+	spmHostName=${hostNames[$selectedSPM]}
+	spmUUID=${spmUUIDS[$selectedSPM]}
+	mdvName=""
+	grepHost="$(echo $spmHostName | cut -d'.' -f1)"
+	hostDir="$LCROOT$(ls $LCROOT | grep $grepHost)"
+	vgsFile="$hostDir/sos_commands/vdsm/lvm_vgs_-v_-o_tags"
+	vgsHighMDV=$(cat $vgsFile | sed s/\,MDT/\,\\nMDT/g | grep MASTER | cut -d',' -f1 | cut -d'=' -f2 | sort -rn | head -n 1)
+	messDEBUG "Other variables have been set: HN:$spmHostName;UUID:$spmUUID;vgs:$vgsFile;vgsMDV:$vgsHighMDV"
+	
+	for i in $(echo  $(cat ${dbdir}/$datStoragePool | sed s/\\t/,/g | grep -vi 'default' | cut -d',' -f7 | grep '^[0-9]'))
+	do
+		messDEBUG "Found mdv: $i"
+		if [ "$highMDV" == "" ]
+		then 
+			highMDV=$i
+		elif [ $i -gt $highMDV ]
+		then
+			messDEBUG "Found MDV $i higher than $highMDV, updating"
+			highMDV=$i		
+		fi		
+		messDEBUG "Highest found value is $highMDV"
+		dbHighMDV=$highMDV
+	done
+	
+	numVGs=$(grep 'TYPE' $vgsFile | wc -l)
+	
+	# Formatted output
+	echo -e "\e[1;34m----------[Storage Info from $spmHostName]----------"
+	echo -e "Host Name: \e[0m$spmHostName"
+	echo -e "\e[1;34mHost UUID: \e[0m$spmUUID"
+	echo -e ""
+	echo -e "\e[1;34mData Domains in Data Center: \e[0m" 
+}
+
+function parseDat {
+	
+	#messDEBUG "Parsing dbdir for dat file with $1 information"
+	# Cycling through dat files again to find related table information
+    #messDEBUG "$(xzgrep -i 'copy' ${dbdir}/* | grep $1 | grep '\.dat' | grep '\$\$\/')"
+    datFile=$(xzgrep -i 'copy' ${dbdir}/* | grep $1 | grep '\.dat' | grep '\$\$\/')
+	
+	#messDEBUG "datfile is: $datFile"
+	datFile=${datFile##\.*\$\/}
+    datFile=${datFile%%\'*\;}
+	
+	#messDEBUG "datFile has been shortened to: $datFile"
+	
+	echo $datFile		
+}
+
 function extractData {
 
 
-        messDEBUG "Found stuff under $LCROOT/log-collector-data"
-        count=$(ls ${LCROOT}/log-collector-data | grep '^post' | wc -l)
-        if [ $count != 0 ]
-        then
-                messDEBUG "Extracting..."
-                xz -d ${LCROOT}/log-collector-data/*.xz >/dev/null 2>&1
-                tar xvf ${LCROOT}/log-collector-data/*.tar >/dev/null 2>&1
-        else
-                messERROR "No compressed database found in the folder"
-                exit 1
-        fi
+	messDEBUG "Found stuff under $LCROOT/log-collector-data"
+	count=$(ls ${LCROOT}/log-collector-data | grep '^post' | wc -l)
+	if [ $count != 0 ]
+	then
+	        messDEBUG "Extracting..."
+	        xz -d ${LCROOT}/log-collector-data/*.xz >/dev/null 2>&1
+	        tar xvf ${LCROOT}/log-collector-data/*.tar >/dev/null 2>&1
+	else
+	        messERROR "No compressed database found in the folder"
+	        exit 1
+	fi
 
 	messDEBUG "Extracted database, moving to host sosreports"
 

@@ -1,0 +1,44 @@
+####################
+#
+# Purpose of this is to outline the overall function flow in the script
+#
+####################
+
+'-l' flag - find master domain version and storage config from SPM
+
+setLCRoot() #initial function
+	|
+	|
+	|
+getSPM()	#Being parsing for SPM information
+	|
+	+- Find sos_pgdump.tar file
+	|
+	+- Decompress tar file, relocated all extracted .dat files to the dbdir
+	|
+	+- Find .dat file which contains the storage_pool table from the database
+	|
+	+- Parse .dat file from UUID(s)
+	|
+	+- Find and parse the .dat file containing the vds_static table for host names that correlate to the found UUID(s)
+	|
+	+- Present all SPMs found and let user choose the one to work with
+	|
+chooseSPM()	
+	|
+	+- Validate user input
+	|
+evalHost()
+
+---------Information for SPM <host-name>--------------
+Host Name: 
+UUID:
+
+Data Domains in DC:
+		Name   VG UUID	LUNs	Paths
+
+	-	Name	UUID	UUID
+	-
+   (M)	Name	UUID	UUID
+   						UUID
+   						UUID

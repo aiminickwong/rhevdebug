@@ -8,10 +8,16 @@
 		<script type="text/javascript" src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
 		<script type="text/javascript" src="effects.js"></script>
 		<script type="text/javascript">
-			google.load('visualization','1',{'packages':['treemap','corechart','orgchart']});
+				google.load('visualization','1',{'packages':['treemap','corechart','orgchart']});
 
+			$(document).ready(function () {
+				    			
+    			initTabs();
+    			
+    			//drawChart();
 
-			google.setOnLoadCallback(drawChart);
+					
+			});
 		</script>
 		<title>
 			devel webrhev
@@ -58,8 +64,8 @@
 					<li style="margin:0; float: right;"><a href="#disk_tab">Disk Map</a></li>
 				</ul>
 
-				<div id="storage_tab" style="z-index:1;">
-					<div id="tree_div"></div>
+				<div id="storage_tab">
+					<div id="tree_div" style="width:350px; height:250px;"></div>
 
 				</div>
 				<div id="network_tab">

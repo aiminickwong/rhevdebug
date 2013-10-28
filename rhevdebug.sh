@@ -230,7 +230,7 @@ then
 
 	#I've yet to find a better way to shorten this down and pull the 'dat' file from the string
 	#From test so far it seems the spm_vds_id field always comes out as the 8th field
-	for i in $(echo  $(cat ${dbdir}/$datFile | sed s/\\t/,/g | grep -vi 'default' | cut -d',' -f8 | grep '^[a-z0-9]'))
+	for i in $(echo  $(cat ${dbdir}/$datFile | sed s/\\t/,/g | cut -d',' -f8 | grep '^[a-z0-9]')) # removed 'grep -vi default' for testing
 	do
 		curSPM="$curSPM $i"
 		messDEBUG "Found UUID: $i"
@@ -285,6 +285,8 @@ function chooseSPM {
 	if [ ${#spmUUIDS[@]} -eq 1 ]
 	then
 		messDEBUG "Only 1 SPM found, skipping user selection"
+		selectedSPM=0
+		evalHost
 	else
 		messDEBUG "More than 1 SPM found, asking user for input"
 		echo -n "Enter the number of the SPM we are using: "
@@ -354,6 +356,9 @@ function evalHost {
 	echo -e "\e[1;34m----------[Storage Info from $spmHostName]----------"
 	echo -e "Host Name: \e[0m$spmHostName"
 	echo -e "\e[1;34mHost UUID: \e[0m$spmUUID"
+	echo -e ""
+	echo -e "\e[1;34mMDV from DB: \e[0m$dbHighMDV"
+	echo -e "\e[1;34mMDV from vgs output: \e[0m$vgsHighMDV"
 	echo -e ""
 	echo -e "\e[1;34mData Domains in Data Center: \e[0m" 
 }
@@ -437,7 +442,7 @@ threadID=""
 database=""
 logFile=""
 vdsmLog=""
-debug=1
+debug=0
 ###-----------------Main Loop-------------------
 
 while getopts ht:dl: option

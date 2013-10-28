@@ -30,6 +30,11 @@ chooseSPM()
 	|
 evalHost()
 
+Note:
+-Need to check for NFS (file) or iSCSI (block) storage domain
+
+- Check with Jack for scripts
+
 ---------Information for SPM <host-name>--------------
 Host Name: 
 UUID:

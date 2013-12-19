@@ -259,10 +259,11 @@ then
 		messERROR "For some reson the number of found SPM UUIDs does not match the number of found Host names. Exiting.."
 		exit 1
 	else
+		echo -e "\e[1;34m-----------------------------------\e[0m"
 		for (( i=0; i < ${#spmUUIDS[@]}; i++ ))
 		do
 			echo -e "\e[1;34m($i) - SPM Host - \e[0m${hostNames[$i]}"
-			echo -e "\e[1;34m      UUID - \e[0m${spmUUIDS[$i]}"
+			echo -e "\e[1;34m      UUID     - \e[0m${spmUUIDS[$i]}"
 			echo -e "\e[1;34m-----------------------------------\e[0m"
 		done
 		# Move on to next step
@@ -330,8 +331,18 @@ function evalHost {
 	spmUUID=${spmUUIDS[$selectedSPM]}
 	mdvName=""
 	grepHost="$(echo $spmHostName | cut -d'.' -f1)"
+	messDEBUG "Looking for a host, trying to find $grepHost"
 	hostDir="$LCROOT$(ls $LCROOT | grep $grepHost)"
-	vgsFile="$hostDir/sos_commands/vdsm/lvm_vgs_-v_-o_tags"
+	
+	#adding for log collectors that do not include host information
+	messDEBUG "Looking for host sosreports..."
+	if [ "${hostDir/$grepHost}" = "$hostDir" ] ; then	
+		messDEBUG "Using ${hostDir/$grepHost} as parameters"
+		messERROR "Could not find the sosreport for the SPM host"
+		exit 1
+	fi
+
+	vgsFile="${hostDir}sos_commands/vdsm/lvm_vgs_-v_-o_tags"
 	vgsHighMDV=$(cat $vgsFile | sed s/\,MDT/\,\\nMDT/g | grep MASTER | cut -d',' -f1 | cut -d'=' -f2 | sort -rn | head -n 1)
 	messDEBUG "Other variables have been set: HN:$spmHostName;UUID:$spmUUID;vgs:$vgsFile;vgsMDV:$vgsHighMDV"
 	
